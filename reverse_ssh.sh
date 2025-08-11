@@ -19,6 +19,11 @@ if ! command -v ssh &> /dev/null; then
     sudo apt-get update && sudo apt-get install -y openssh-server
 fi
 
+if ! command -v autossh &> /dev/null; then
+    echo "Installing AutoSSH..."
+    sudo apt-get install -y autossh
+fi
+
 # Generate SSH key if not exists
 if [ ! -f "$SSH_KEY" ]; then
     echo "Generating SSH key..."
@@ -45,16 +50,16 @@ SERVICE_FILE="/etc/systemd/system/$SERVICE_NAME.service"
 sudo bash -c "cat > $SERVICE_FILE" <<EOF
 [Unit]
 Description=Reverse SSH Tunnel
-After=network.target
+After=network-online.target
+Wants=network-online.target
 
 [Service]
 User=$USER
-ExecStart=/usr/bin/ssh -N -R $LOCAL_PORT:localhost:22 -i $SSH_KEY $REMOTE_USER@$REMOTE_HOST -p $REMOTE_PORT
-Restart=on-failure
+Environment="AUTOSSH_GATETIME=0"
+ExecStart=/usr/bin/autossh -M 0 -N -R $LOCAL_PORT:localhost:22 -i $SSH_KEY -o "ServerAliveInterval 30" -o "ServerAliveCountMax 3" -o ExitOnForwardFailure=yes $REMOTE_USER@$REMOTE_HOST -p $REMOTE_PORT
+Restart=always
 RestartSec=30s
-StartLimitBurst=5
-TimeoutStartSec=60s
-StartLimitInterval=200
+StartLimitBurst=0
 
 [Install]
 WantedBy=multi-user.target
